@@ -15,7 +15,7 @@ import com.example.regionalapplab.data.entity.Territory
 
 @Database(
     entities = [Employee::class, Region::class, Territory::class, EmployeeTerritory::class],
-    version = 3,
+    version = 5,
     exportSchema = false
 )
 
