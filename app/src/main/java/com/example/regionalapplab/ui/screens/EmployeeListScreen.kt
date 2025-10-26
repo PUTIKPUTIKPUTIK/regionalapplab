@@ -4,7 +4,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -25,6 +27,7 @@ import com.example.regionalapplab.ui.viewmodel.RegionViewModel
 import com.example.regionalapplab.ui.viewmodel.TerritoryViewModel
 import androidx.lifecycle.viewmodel.viewModelFactory
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EmployeeListScreen() {
     val context = LocalContext.current.applicationContext as android.app.Application
@@ -45,11 +48,13 @@ fun EmployeeListScreen() {
     var showAddDialog by remember { mutableStateOf(false) }
 
     val employees = employeeViewModel.employees
-    val regions = regionViewModel.regions
-    val territories = territoryViewModel.territories
+    val regions = listOf("Все", "Регион А", "Регион Б", "Регион В")
 
-    val regionsList = remember { regionViewModel.regions }
-    val territoriesList = remember { territoryViewModel.territories }
+    var selectedRegion by remember { mutableStateOf("Все") }
+    var regionExpanded by remember { mutableStateOf(false) }
+
+    val filteredEmployees = if (selectedRegion == "Все") employees
+    else employees.filter { it.region == selectedRegion }
 
     Column(modifier = Modifier.fillMaxSize().padding(32.dp)) {
 
@@ -58,10 +63,44 @@ fun EmployeeListScreen() {
             modifier = Modifier.fillMaxWidth()
         ) { Text("Добавить сотрудника") }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
         LazyColumn(modifier = Modifier.fillMaxSize()) {
-            items(employees) { employee ->
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
+
+                ExposedDropdownMenuBox(
+                    expanded = regionExpanded,
+                    onExpandedChange = { regionExpanded = !regionExpanded },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = selectedRegion,
+                        onValueChange = {},
+                        label = { Text("Фильтр по региону") },
+                        readOnly = true,
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(regionExpanded) },
+                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                    )
+                    DropdownMenu(
+                        expanded = regionExpanded,
+                        onDismissRequest = { regionExpanded = false },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        regions.forEach { region ->
+                            DropdownMenuItem(
+                                text = { Text(region) },
+                                onClick = {
+                                    selectedRegion = region
+                                    regionExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            items(filteredEmployees) { employee ->
                 EmployeeItem(
                     employee = employee,
                     onDelete = { employeeViewModel.delete(it) },
@@ -144,16 +183,16 @@ fun EmployeeDialog(
         Territory(3, "Город A3", 1),
         Territory(4, "Город A4", 1),
         Territory(5, "Город A5", 1),
-        Territory(6, "Город B1", 2),
-        Territory(7, "Город B2", 2),
-        Territory(8, "Город B3", 2),
-        Territory(9, "Город B4", 2),
-        Territory(10, "Город B5", 2),
-        Territory(11, "Город C1", 3),
-        Territory(12, "Город C2", 3),
-        Territory(13, "Город C3", 3),
-        Territory(14, "Город C4", 3),
-        Territory(15, "Город C5", 3)
+        Territory(6, "Город Б1", 2),
+        Territory(7, "Город Б2", 2),
+        Territory(8, "Город Б3", 2),
+        Territory(9, "Город Б4", 2),
+        Territory(10, "Город Б5", 2),
+        Territory(11, "Город В1", 3),
+        Territory(12, "Город В2", 3),
+        Territory(13, "Город В3", 3),
+        Territory(14, "Город В4", 3),
+        Territory(15, "Город В5", 3)
     )
 
     // --- Состояния полей ---
@@ -180,18 +219,20 @@ fun EmployeeDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (employee == null) "Добавить сотрудника" else "Редактировать сотрудника") },
         text = {
-            Column (modifier = Modifier.padding(top = 16.dp)) {
+            val scrollState = rememberScrollState()
+            Column (modifier = Modifier.padding(top = 16.dp).verticalScroll((scrollState))) {
                 // --- Поля сотрудника ---
-                OutlinedTextField(value = lastName, onValueChange = { lastName = it }, label = { Text("Фамилия") })
-                OutlinedTextField(value = firstName, onValueChange = { firstName = it }, label = { Text("Имя") })
-                OutlinedTextField(value = secondName, onValueChange = { secondName = it }, label = { Text("Отчество") })
-                OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Должность") })
+                OutlinedTextField(value = lastName, onValueChange = { lastName = it }, label = { Text("Фамилия") }, isError = lastName.isBlank())
+                OutlinedTextField(value = firstName, onValueChange = { firstName = it }, label = { Text("Имя") }, isError = firstName.isBlank())
+                OutlinedTextField(value = secondName, onValueChange = { secondName = it }, label = { Text("Отчество") }, isError = secondName.isBlank())
+                OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Должность") }, isError = title.isBlank())
                 OutlinedTextField(
                     value = birthDay,
                     onValueChange = { birthDay = it },
                     label = { Text("Дата рождения") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    visualTransformation = DateVisualTransformation()
+                    visualTransformation = DateVisualTransformation(),
+                    isError = birthDay.isBlank()
                 )
                 OutlinedTextField(value = address, onValueChange = { address = it }, label = { Text("Адрес") })
                 OutlinedTextField(
@@ -199,13 +240,15 @@ fun EmployeeDialog(
                     onValueChange = { phone = it },
                     label = { Text("Телефон") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                    visualTransformation = PhoneNumberVisualTransformation()
+                    visualTransformation = PhoneNumberVisualTransformation(),
+                    isError = phone.isBlank()
                 )
                 OutlinedTextField(
                     value = email,
                     onValueChange = { email = it },
                     label = { Text("Email") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                    isError = email.isBlank()
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -221,12 +264,13 @@ fun EmployeeDialog(
                         label = { Text("Регион") },
                         readOnly = true,
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = regionExpanded) },
-                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                        modifier = Modifier.menuAnchor().fillMaxWidth(),
+                        isError = selectedRegion.isBlank()
                     )
                     DropdownMenu(
                         expanded = regionExpanded,
                         onDismissRequest = { regionExpanded = false },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
                         regions.forEach { region ->
                             DropdownMenuItem(
@@ -255,7 +299,8 @@ fun EmployeeDialog(
                         readOnly = true,
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = cityExpanded) },
                         modifier = Modifier.menuAnchor().fillMaxWidth(),
-                        enabled = selectedRegion.isNotEmpty()
+                        enabled = selectedRegion.isNotEmpty(),
+                        isError = selectedCity.isBlank()
                     )
                     DropdownMenu(
                         expanded = cityExpanded,
@@ -277,6 +322,12 @@ fun EmployeeDialog(
         },
         confirmButton = {
             TextButton(onClick = {
+                if (firstName.isBlank() || lastName.isBlank() || secondName.isBlank() ||
+                    title.isBlank() || birthDay.isBlank() || address.isBlank() ||
+                    phone.isBlank() || email.isBlank() || selectedRegion.isBlank() || selectedCity.isBlank()
+                ) {
+                    return@TextButton
+                }
                 onSave(
                     Employee(
                         id = employee?.id ?: 0,
